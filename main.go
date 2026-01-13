@@ -16,14 +16,15 @@ import (
 )
 
 var (
-	minutesFlag   int
-	showTimeFlag  bool
-	autoYesFlag   bool
+	minutesFlag         int
+	autoYesFlag         bool
+	cachedWorkDuration  time.Duration
+	cachedBreakDuration time.Duration
+	durationsSet        bool
 )
 
 func init() {
-	flag.IntVar(&minutesFlag, "m", 25, "Duration in minutes")
-	flag.BoolVar(&showTimeFlag, "t", false, "Show time remaining instead of percentage")
+	flag.IntVar(&minutesFlag, "m", 25, "Default work duration in minutes")
 	flag.BoolVar(&autoYesFlag, "y", false, "Auto-confirm prompts (for scripting)")
 	flag.Parse()
 }
@@ -31,79 +32,122 @@ func init() {
 func main() {
 	engine := timer.NewEngine()
 	sessionNum := 1
+	cycleNum := 1
 
 	for {
-		duration := getDuration()
-		showTime := getShowTimePreference()
-
-		runSession(engine, sessionNum, duration, showTime)
-
-		if !askContinue() {
+		// Run WORK session
+		workDuration := getDuration(timer.WORK)
+		workCompleted := runSession(engine, sessionNum, workDuration, timer.WORK, cycleNum)
+		if !workCompleted {
 			printRecap(engine)
 			break
 		}
 		sessionNum++
+
+		// Add 2-second pause between sessions
+		if !autoYesFlag {
+			fmt.Printf("\nTime for a break!")
+			time.Sleep(2 * time.Second)
+		} else {
+			// For auto-yes, still show brief transition
+			fmt.Printf("\nTime for a break!")
+			time.Sleep(2 * time.Second)
+		}
+
+		// Run BREAK session
+		breakDuration := getDuration(timer.BREAK)
+		breakCompleted := runSession(engine, sessionNum, breakDuration, timer.BREAK, cycleNum)
+		if !breakCompleted {
+			printRecap(engine)
+			break
+		}
+		sessionNum++
+
+		// Ask to continue with another cycle
+		if !askContinue() {
+			printRecap(engine)
+			break
+		}
+		cycleNum++
 	}
 }
 
-func getDuration() time.Duration {
-	if minutesFlag != 25 {
-		return time.Duration(minutesFlag) * time.Minute
+func getDuration(sessionType timer.SessionType) time.Duration {
+	// Use cached durations if already set
+	if durationsSet {
+		if sessionType == timer.WORK {
+			return cachedWorkDuration
+		} else {
+			return cachedBreakDuration
+		}
 	}
 
+	// First time setting up durations
 	if autoYesFlag {
-		return 25 * time.Minute
+		cachedWorkDuration = 25 * time.Minute
+		cachedBreakDuration = 5 * time.Minute
+		durationsSet = true
+		return cachedWorkDuration
 	}
 
-	fmt.Print("Duration in minutes (default 25): ")
+	// Get work duration
+	fmt.Print("Work duration in minutes (default 25): ")
 	reader := bufio.NewReader(os.Stdin)
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(input)
 
 	if input == "" {
-		return 25 * time.Minute
+		cachedWorkDuration = 25 * time.Minute
+	} else {
+		var minutes float64
+		fmt.Sscanf(input, "%f", &minutes)
+		if minutes <= 0 {
+			minutes = 25
+		}
+		cachedWorkDuration = time.Duration(minutes * float64(time.Minute))
 	}
 
-	var minutes int
-	fmt.Sscanf(input, "%d", &minutes)
-	if minutes <= 0 {
-		minutes = 25
+	// Get break duration
+	fmt.Print("Break duration in minutes (default 5): ")
+	input, _ = reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+
+	if input == "" {
+		cachedBreakDuration = 5 * time.Minute
+	} else {
+		var minutes float64
+		fmt.Sscanf(input, "%f", &minutes)
+		if minutes <= 0 {
+			minutes = 5
+		}
+		cachedBreakDuration = time.Duration(minutes * float64(time.Minute))
 	}
 
-	return time.Duration(minutes) * time.Minute
+	durationsSet = true
+
+	if sessionType == timer.WORK {
+		return cachedWorkDuration
+	} else {
+		return cachedBreakDuration
+	}
 }
 
-func getShowTimePreference() bool {
-	if showTimeFlag {
-		return true
-	}
-
-	if autoYesFlag {
-		return false
-	}
-
-	fmt.Print("Show time remaining with seconds? [y/N]: ")
-	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(strings.ToLower(input))
-
-	return input == "y" || input == "yes"
-}
-
-func runSession(engine *timer.Engine, sessionNum int, duration time.Duration, showTime bool) {
+func runSession(engine *timer.Engine, sessionNum int, duration time.Duration, sessionType timer.SessionType, cycleNum int) bool {
 	engine.AddSession(duration)
 	totalSeconds := int64(duration.Seconds())
-	progress := ui.NewRenderer(totalSeconds, sessionNum)
+	progress := ui.NewRenderer(totalSeconds, sessionNum, sessionType, cycleNum)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
+	cancelled := make(chan bool, 1)
+
 	go func() {
 		<-c
 		fmt.Print("\033[?25h")
-		progress.CancelledMessage(sessionNum)
+		progress.CancelledMessage(sessionNum, cycleNum)
 		engine.CancelSession(sessionNum - 1)
-		os.Exit(0)
+		cancelled <- true
 	}()
 
 	progress.Start()
@@ -111,29 +155,29 @@ func runSession(engine *timer.Engine, sessionNum int, duration time.Duration, sh
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
 
-	for range ticker.C {
-		current := progress.GetCurrent()
-		elapsed := time.Duration(current) * time.Second
+	for {
+		select {
+		case <-ticker.C:
+			current := progress.GetCurrent()
+			elapsed := time.Duration(current) * time.Second
 
-		progress.Increment()
-		if showTime {
+			progress.Increment()
 			progress.DrawTimeLeft(elapsed, duration)
-		} else {
-			progress.DrawPercentage(elapsed, duration)
-		}
 
-		progress.DrawClock()
-
-		if current >= int(totalSeconds) {
-			break
+			if current >= int(totalSeconds) {
+				return true
+			}
+		case <-cancelled:
+			return false
 		}
 	}
 
 	fmt.Println()
-	progress.FinalMessage(sessionNum)
+	progress.FinalMessage(sessionNum, cycleNum)
 	engine.CompleteSession(sessionNum - 1)
 
 	notify.PlayCompletionSound()
+	return true
 }
 
 func askContinue() bool {
@@ -141,7 +185,7 @@ func askContinue() bool {
 		return true
 	}
 
-	fmt.Print("Continue with another session? [Y/n]: ")
+	fmt.Print("Continue with another cycle? [Y/n]: ")
 	reader := bufio.NewReader(os.Stdin)
 	input, _ := reader.ReadString('\n')
 	input = strings.TrimSpace(strings.ToLower(input))
@@ -154,26 +198,26 @@ func askContinue() bool {
 
 func printRecap(engine *timer.Engine) {
 	sessions := make([]struct {
-		Duration    string
-		StartTime   string
-		EndTime     string
-		Completed   bool
-		Cancelled   bool
+		Duration  string
+		StartTime string
+		EndTime   string
+		Completed bool
+		Cancelled bool
 	}, len(engine.Sessions))
 
 	for i, s := range engine.Sessions {
 		sessions[i] = struct {
-			Duration    string
-			StartTime   string
-			EndTime     string
-			Completed   bool
-			Cancelled   bool
+			Duration  string
+			StartTime string
+			EndTime   string
+			Completed bool
+			Cancelled bool
 		}{
-			Duration:    timer.FormatDuration(s.Duration),
-			StartTime:   s.StartTime.Format("15:04"),
-			EndTime:     s.EndTime.Format("15:04"),
-			Completed:   s.Completed,
-			Cancelled:   s.WasCancelled,
+			Duration:  timer.FormatDuration(s.Duration),
+			StartTime: s.StartTime.Format("15:04"),
+			EndTime:   s.EndTime.Format("15:04"),
+			Completed: s.Completed,
+			Cancelled: s.WasCancelled,
 		}
 	}
 

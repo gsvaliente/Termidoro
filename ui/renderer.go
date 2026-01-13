@@ -2,20 +2,75 @@ package ui
 
 import (
 	"fmt"
+	"math"
+	"os"
 	"time"
+
+	"golang.org/x/term"
+	"pomodoro/timer"
 )
 
 type Renderer struct {
-	totalSecs int64
-	current   int
-	sessionNum int
+	totalSecs   int64
+	current     int
+	sessionNum  int
+	cycleNum    int
+	sessionType timer.SessionType
+	termWidth   int
+	termHeight  int
+	centerX     int
+	centerY     int
 }
 
-func NewRenderer(totalSeconds int64, sessionNum int) *Renderer {
+type RGB struct {
+	R, G, B int
+}
+
+func interpolateColor(start, end RGB, percent float64) RGB {
+	return RGB{
+		R: int(math.Round(float64(start.R) + (float64(end.R-start.R) * percent / 100.0))),
+		G: int(math.Round(float64(start.G) + (float64(end.G-start.G) * percent / 100.0))),
+		B: int(math.Round(float64(start.B) + (float64(end.B-start.B) * percent / 100.0))),
+	}
+}
+
+func (r RGB) toANSI() string {
+	return fmt.Sprintf("\033[38;2;%d;%d;%dm", r.R, r.G, r.B)
+}
+
+func getWorkGradientColors() (RGB, RGB) {
+	return RGB{139, 92, 246}, RGB{59, 130, 246} // Purple to Blue
+}
+
+func getBreakGradientColors() (RGB, RGB) {
+	return RGB{251, 146, 60}, RGB{239, 68, 68} // Orange to Red
+}
+
+func NewRenderer(totalSeconds int64, sessionNum int, sessionType timer.SessionType, cycleNum int) *Renderer {
+	// Get terminal size
+	width, height, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil {
+		width, height = 80, 24 // Fallback size
+	}
+
+	// Calculate center positions for a 73-char wide box (35 progress bar + brackets + time text)
+	boxWidth := 73
+	centerX := (width - boxWidth) / 2
+	if centerX < 1 {
+		centerX = 1
+	}
+	centerY := height / 2
+
 	return &Renderer{
-		totalSecs:  totalSeconds,
-		current:    0,
-		sessionNum: sessionNum,
+		totalSecs:   totalSeconds,
+		current:     0,
+		sessionNum:  sessionNum,
+		cycleNum:    cycleNum,
+		sessionType: sessionType,
+		termWidth:   width,
+		termHeight:  height,
+		centerX:     centerX,
+		centerY:     centerY,
 	}
 }
 
@@ -41,27 +96,33 @@ func (r *Renderer) GetCurrent() int {
 	return r.current
 }
 
-func (r *Renderer) DrawClock() {
-	now := time.Now()
-	timeStr := now.Format("15:04:05")
-	fmt.Printf("\033[4;58H\033[K%s", timeStr)
-}
-
 func (r *Renderer) DrawTimeLeft(elapsed, total time.Duration) {
 	remaining := total - elapsed
 	percent := float64(elapsed) / float64(total) * 100
 	bar := r.createProgressBar(percent)
-	fmt.Printf("\033[3;2H\033[K%s  %.0f%%  %dm %02ds left", bar, percent, int(remaining.Minutes()), int(remaining.Seconds())%60)
+
+	// Position progress bar relative to centered box: centerY + 2, centerX + 2
+	progressX := r.centerX + 2
+	progressY := r.centerY + 2
+	fmt.Printf("\033[%d;%dH\033[K%s  %.0f%%", progressY, progressX, bar, percent)
+
+	// Position time remaining in bottom right corner: centerY + 2, centerX + 70
+	timeX := r.centerX + 70
+	timeY := r.centerY + 2
+	fmt.Printf("\033[%d;%dH%dm %02ds left", timeY, timeX, int(remaining.Minutes()), int(remaining.Seconds())%60)
 }
 
 func (r *Renderer) DrawPercentage(elapsed, total time.Duration) {
 	percent := float64(elapsed) / float64(total) * 100
 	bar := r.createProgressBar(percent)
-	fmt.Printf("\033[3;2H\033[K%s  %.0f%%", bar, percent)
+	// Position percentage relative to centered box: centerY + 2, centerX + 2
+	progressX := r.centerX + 2
+	progressY := r.centerY + 2
+	fmt.Printf("\033[%d;%dH\033[K%s  %.0f%%", progressY, progressX, bar, percent)
 }
 
 func (r *Renderer) createProgressBar(percent float64) string {
-	width := 20
+	width := 35
 	filled := int(percent * float64(width) / 100)
 	if filled > width {
 		filled = width
@@ -70,10 +131,24 @@ func (r *Renderer) createProgressBar(percent float64) string {
 		filled = 0
 	}
 	empty := width - filled
+
+	var startColor, endColor RGB
+	if r.sessionType == timer.WORK {
+		startColor, endColor = getWorkGradientColors()
+	} else {
+		startColor, endColor = getBreakGradientColors()
+	}
+
 	result := "["
 	for i := 0; i < filled; i++ {
-		result += "█"
+		// Calculate position in gradient (0 to 100% based on character position)
+		charPercent := float64(i) * 100.0 / float64(width)
+		color := interpolateColor(startColor, endColor, charPercent)
+		result += color.toANSI() + "█\033[0m" + color.toANSI()
 	}
+
+	// Reset color after filled section
+	result += "\033[0m"
 	for i := 0; i < empty; i++ {
 		result += "░"
 	}
@@ -83,11 +158,22 @@ func (r *Renderer) createProgressBar(percent float64) string {
 
 func (r *Renderer) DrawHeader() {
 	fmt.Print("\033[2J\033[H")
-	fmt.Println()
-	fmt.Printf("[Pomodoro %d]\n", r.sessionNum)
-	fmt.Println("┌─────────────────────────────────────────────────────────┐")
-	fmt.Println("│                                                         │")
-	fmt.Println("└─────────────────────────────────────────────────────────┘")
+
+	// Position header at center
+	headerX := r.centerX + 1
+	headerY := r.centerY
+	sessionTypeText := "WORK"
+	if r.sessionType == timer.BREAK {
+		sessionTypeText = "BREAK"
+	}
+
+	// Draw session type and cycle number
+	fmt.Printf("\033[%d;%dH[%s Cycle %d]", headerY, headerX, sessionTypeText, r.cycleNum)
+
+	// Draw complete box borders
+	fmt.Printf("\033[%d;%dH┌─────────────────────────────────────────────────────────────────────┐", headerY+1, headerX)
+	fmt.Printf("\033[%d;%dH│                                                                 │", headerY+2, headerX)
+	fmt.Printf("\033[%d;%dH└─────────────────────────────────────────────────────────────────────┘", headerY+3, headerX)
 }
 
 func (r *Renderer) ClearScreen() {
@@ -110,12 +196,20 @@ func (r *Renderer) EraseLine() {
 	fmt.Print("\033[2K")
 }
 
-func (r *Renderer) FinalMessage(sessionNum int) {
-	fmt.Printf("\n\nPomodoro %d completed!\n\n", sessionNum)
+func (r *Renderer) FinalMessage(sessionNum int, cycleNum int) {
+	sessionTypeText := "Work"
+	if r.sessionType == timer.BREAK {
+		sessionTypeText = "Break"
+	}
+	fmt.Printf("\n\n%s Cycle %d completed!\n\n", sessionTypeText, cycleNum)
 }
 
-func (r *Renderer) CancelledMessage(sessionNum int) {
-	fmt.Printf("\n\nPomodoro %d cancelled\n", sessionNum)
+func (r *Renderer) CancelledMessage(sessionNum int, cycleNum int) {
+	sessionTypeText := "Work"
+	if r.sessionType == timer.BREAK {
+		sessionTypeText = "Break"
+	}
+	fmt.Printf("\n\n%s Cycle %d cancelled\n", sessionTypeText, cycleNum)
 }
 
 func FormatDuration(d time.Duration) string {
@@ -131,11 +225,11 @@ func FormatDurationShort(d time.Duration) string {
 }
 
 func PrintRecap(sessions []struct {
-	Duration    string
-	StartTime   string
-	EndTime     string
-	Completed   bool
-	Cancelled   bool
+	Duration  string
+	StartTime string
+	EndTime   string
+	Completed bool
+	Cancelled bool
 }, totalTime time.Duration) {
 	fmt.Println()
 	fmt.Println("--- Session Recap ---")
