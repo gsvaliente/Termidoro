@@ -20,8 +20,32 @@ var (
 	autoYesFlag         bool
 	cachedWorkDuration  time.Duration
 	cachedBreakDuration time.Duration
+	customWorkName      string
 	durationsSet        bool
 )
+
+func parseDuration(durationStr string) time.Duration {
+	if durationStr == "" {
+		return 0
+	}
+
+	// Default to minutes if no unit specified
+	if len(durationStr) == 0 {
+		return 0
+	}
+
+	// Parse using time.ParseDuration
+	duration, err := time.ParseDuration(durationStr)
+	if err != nil {
+		// If parsing fails, try appending 'm' for minutes
+		if duration, err := time.ParseDuration(durationStr + "m"); err == nil {
+			return duration
+		}
+		return 0
+	}
+
+	return duration
+}
 
 func init() {
 	flag.IntVar(&minutesFlag, "m", 25, "Default work duration in minutes")
@@ -30,6 +54,25 @@ func init() {
 }
 
 func main() {
+	// Parse positional arguments after flag parsing
+	args := flag.Args()
+	if len(args) > 0 {
+		cachedWorkDuration = parseDuration(args[0])
+		if cachedWorkDuration == 0 {
+			cachedWorkDuration = 25 * time.Minute
+		}
+		durationsSet = true
+	}
+	if len(args) > 1 {
+		cachedBreakDuration = parseDuration(args[1])
+		if cachedBreakDuration == 0 {
+			cachedBreakDuration = 5 * time.Minute
+		}
+	}
+	if len(args) > 2 {
+		customWorkName = args[2]
+	}
+
 	engine := timer.NewEngine()
 	sessionNum := 1
 	cycleNum := 1
@@ -84,9 +127,11 @@ func getDuration(sessionType timer.SessionType) time.Duration {
 
 	// First time setting up durations
 	if autoYesFlag {
-		cachedWorkDuration = 25 * time.Minute
-		cachedBreakDuration = 5 * time.Minute
-		durationsSet = true
+		if !durationsSet {
+			cachedWorkDuration = 25 * time.Minute
+			cachedBreakDuration = 5 * time.Minute
+			durationsSet = true
+		}
 		return cachedWorkDuration
 	}
 
@@ -135,7 +180,7 @@ func getDuration(sessionType timer.SessionType) time.Duration {
 func runSession(engine *timer.Engine, sessionNum int, duration time.Duration, sessionType timer.SessionType, cycleNum int) bool {
 	engine.AddSession(duration)
 	totalSeconds := int64(duration.Seconds())
-	progress := ui.NewRenderer(totalSeconds, sessionNum, sessionType, cycleNum)
+	progress := ui.NewRenderer(totalSeconds, sessionNum, sessionType, cycleNum, customWorkName)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)

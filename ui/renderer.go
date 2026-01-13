@@ -16,6 +16,7 @@ type Renderer struct {
 	sessionNum  int
 	cycleNum    int
 	sessionType timer.SessionType
+	customName  string
 	termWidth   int
 	termHeight  int
 	centerX     int
@@ -46,7 +47,7 @@ func getBreakGradientColors() (RGB, RGB) {
 	return RGB{251, 146, 60}, RGB{239, 68, 68} // Orange to Red
 }
 
-func NewRenderer(totalSeconds int64, sessionNum int, sessionType timer.SessionType, cycleNum int) *Renderer {
+func NewRenderer(totalSeconds int64, sessionNum int, sessionType timer.SessionType, cycleNum int, customName ...string) *Renderer {
 	// Get terminal size
 	width, height, err := term.GetSize(int(os.Stdout.Fd()))
 	if err != nil {
@@ -61,12 +62,25 @@ func NewRenderer(totalSeconds int64, sessionNum int, sessionType timer.SessionTy
 	}
 	centerY := height / 2
 
+	// Handle custom name
+	var displayName string
+	if sessionType == timer.WORK {
+		if len(customName) > 0 && customName[0] != "" {
+			displayName = customName[0]
+		} else {
+			displayName = "WORK"
+		}
+	} else { // sessionType == timer.BREAK
+		displayName = "BREAK"
+	}
+
 	return &Renderer{
 		totalSecs:   totalSeconds,
 		current:     0,
 		sessionNum:  sessionNum,
 		cycleNum:    cycleNum,
 		sessionType: sessionType,
+		customName:  displayName,
 		termWidth:   width,
 		termHeight:  height,
 		centerX:     centerX,
@@ -162,13 +176,9 @@ func (r *Renderer) DrawHeader() {
 	// Position header at center
 	headerX := r.centerX + 1
 	headerY := r.centerY
-	sessionTypeText := "WORK"
-	if r.sessionType == timer.BREAK {
-		sessionTypeText = "BREAK"
-	}
 
 	// Draw session type and cycle number
-	fmt.Printf("\033[%d;%dH[%s Cycle %d]", headerY, headerX, sessionTypeText, r.cycleNum)
+	fmt.Printf("\033[%d;%dH[%s Cycle %d]", headerY, headerX, r.customName, r.cycleNum)
 
 	// Draw complete box borders
 	fmt.Printf("\033[%d;%dH┌─────────────────────────────────────────────────────────────────────┐", headerY+1, headerX)
@@ -197,19 +207,11 @@ func (r *Renderer) EraseLine() {
 }
 
 func (r *Renderer) FinalMessage(sessionNum int, cycleNum int) {
-	sessionTypeText := "Work"
-	if r.sessionType == timer.BREAK {
-		sessionTypeText = "Break"
-	}
-	fmt.Printf("\n\n%s Cycle %d completed!\n\n", sessionTypeText, cycleNum)
+	fmt.Printf("\n\n%s Cycle %d completed!\n\n", r.customName, cycleNum)
 }
 
 func (r *Renderer) CancelledMessage(sessionNum int, cycleNum int) {
-	sessionTypeText := "Work"
-	if r.sessionType == timer.BREAK {
-		sessionTypeText = "Break"
-	}
-	fmt.Printf("\n\n%s Cycle %d cancelled\n", sessionTypeText, cycleNum)
+	fmt.Printf("\n\n%s Cycle %d cancelled\n", r.customName, cycleNum)
 }
 
 func FormatDuration(d time.Duration) string {
