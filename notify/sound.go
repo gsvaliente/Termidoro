@@ -5,7 +5,6 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
-	"time"
 
 	"github.com/gen2brain/beeep"
 )
@@ -44,10 +43,6 @@ func PlayBreakCompleteSound() error {
 		beeep.Notify("Break Complete", "Ready for another session?", "")
 	}()
 	return nil
-}
-
-func PlayAlert(title, message string) error {
-	return beeep.Alert(title, message, "")
 }
 
 func flashTerminal() {
@@ -105,45 +100,12 @@ func playMacOSSound(soundType string) error {
 }
 
 func playLinuxSound(frequency, duration int) error {
-	// Visual feedback first
 	flashTerminal()
 
-	// Try beep command first (most reliable)
-	beepCmd := exec.Command("beep", "-f", fmt.Sprintf("%d", frequency), "-l", fmt.Sprintf("%d", duration))
-	err := beepCmd.Start()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "beep start failed: %v, trying beeep fallback\n", err)
-		return playEnhancedBeeep(frequency, duration, 2)
-	}
+	durationSec := float64(duration) / 1000.0
+	cmd := exec.Command("ffplay", "-nodisp", "-autoexit",
+		"-t", fmt.Sprintf("%.2f", durationSec),
+		"-freq", fmt.Sprintf("%d", frequency))
 
-	// Wait for completion with timeout
-	done := make(chan error, 1)
-	go func() {
-		done <- beepCmd.Wait()
-	}()
-
-	select {
-	case <-done:
-		return nil
-	case <-time.After(2 * time.Second):
-		beepCmd.Process.Kill()
-		fmt.Fprintf(os.Stderr, "beep timeout, trying beeep fallback\n")
-		return playEnhancedBeeep(frequency, duration, 2)
-	}
-}
-
-func playEnhancedBeeep(frequency, duration, repetitions int) error {
-	// Play multiple times with slight delay for better audibility
-	for i := 0; i < repetitions; i++ {
-		if err := beeep.Beep(float64(frequency), duration); err != nil {
-			fmt.Fprintf(os.Stderr, "enhanced beeep failed: %v\n", err)
-			return err
-		}
-
-		if i < repetitions-1 {
-			time.Sleep(100 * time.Millisecond)
-		}
-	}
-
-	return nil
+	return cmd.Run()
 }
