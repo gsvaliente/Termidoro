@@ -18,6 +18,7 @@ import (
 var (
 	minutesFlag         int
 	autoYesFlag         bool
+	noSoundFlag         bool
 	cachedWorkDuration  time.Duration
 	cachedBreakDuration time.Duration
 	customWorkName      string
@@ -50,10 +51,14 @@ func parseDuration(durationStr string) time.Duration {
 func init() {
 	flag.IntVar(&minutesFlag, "m", 25, "Default work duration in minutes")
 	flag.BoolVar(&autoYesFlag, "y", false, "Auto-confirm prompts (for scripting)")
+	flag.BoolVar(&noSoundFlag, "no-sound", false, "Disable sound notifications")
 	flag.Parse()
 }
 
 func main() {
+	// Configure sound based on flag
+	notify.SetSoundEnabled(!noSoundFlag)
+
 	// Parse positional arguments after flag parsing
 	args := flag.Args()
 	if len(args) > 0 {
@@ -220,6 +225,12 @@ func runSession(engine *timer.Engine, sessionNum int, duration time.Duration, se
 			progress.DrawTimeLeft(elapsed, duration)
 
 			if current >= int(totalSeconds) {
+				// Play notification BEFORE returning
+				if sessionType == timer.WORK {
+					notify.PlayWorkCompleteSound()
+				} else {
+					notify.PlayBreakCompleteSound()
+				}
 				return true
 			}
 		case <-resizeTicker.C:
@@ -237,7 +248,16 @@ func runSession(engine *timer.Engine, sessionNum int, duration time.Duration, se
 	progress.FinalMessage(sessionNum, cycleNum)
 	engine.CompleteSession(sessionNum - 1)
 
-	notify.PlayCompletionSound()
+	// Play appropriate sound based on session type
+	fmt.Fprintf(os.Stderr, "[DEBUG] Session completed, about to play notification\n")
+	if sessionType == timer.WORK {
+		fmt.Fprintf(os.Stderr, "[DEBUG] Calling notify.PlayWorkCompleteSound()\n")
+		notify.PlayWorkCompleteSound()
+	} else {
+		fmt.Fprintf(os.Stderr, "[DEBUG] Calling notify.PlayBreakCompleteSound()\n")
+		notify.PlayBreakCompleteSound()
+	}
+	fmt.Fprintf(os.Stderr, "[DEBUG] Notification call completed\n")
 	return true
 }
 
