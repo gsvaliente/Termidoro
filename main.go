@@ -56,6 +56,10 @@ func init() {
 }
 
 func main() {
+	defer func() {
+		fmt.Print("\033[?25h")
+	}()
+
 	// Configure sound based on flag
 	notify.SetSoundEnabled(!noSoundFlag)
 
@@ -207,6 +211,8 @@ func runSession(engine *timer.Engine, sessionNum int, duration time.Duration, se
 	}()
 
 	progress.Start()
+
+	defer progress.RestoreCursor()
 
 	ticker := time.NewTicker(time.Second)
 	resizeTicker := time.NewTicker(500 * time.Millisecond) // Check for resizes every 500ms
