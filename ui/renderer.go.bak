@@ -6,16 +6,18 @@ import (
 )
 
 type Renderer struct {
-	totalSecs int64
-	current   int
-	sessionNum int
+	totalSecs   int64
+	current     int
+	sessionNum  int
+	sessionType string
 }
 
-func NewRenderer(totalSeconds int64, sessionNum int) *Renderer {
+func NewRenderer(totalSeconds int64, sessionNum int, sessionType string) *Renderer {
 	return &Renderer{
-		totalSecs:  totalSeconds,
-		current:    0,
-		sessionNum: sessionNum,
+		totalSecs:   totalSeconds,
+		current:     0,
+		sessionNum:  sessionNum,
+		sessionType: sessionType,
 	}
 }
 
@@ -84,7 +86,7 @@ func (r *Renderer) createProgressBar(percent float64) string {
 func (r *Renderer) DrawHeader() {
 	fmt.Print("\033[2J\033[H")
 	fmt.Println()
-	fmt.Printf("[Pomodoro %d]\n", r.sessionNum)
+	fmt.Printf("[Pomodoro %d - %s]\n", r.sessionNum, r.sessionType)
 	fmt.Println("┌─────────────────────────────────────────────────────────┐")
 	fmt.Println("│                                                         │")
 	fmt.Println("└─────────────────────────────────────────────────────────┘")
@@ -110,12 +112,19 @@ func (r *Renderer) EraseLine() {
 	fmt.Print("\033[2K")
 }
 
-func (r *Renderer) FinalMessage(sessionNum int) {
-	fmt.Printf("\n\nPomodoro %d completed!\n\n", sessionNum)
+func (r *Renderer) FinalMessage(sessionNum int, sessionType string) {
+	fmt.Println()
+	fmt.Println()
+	if sessionType == "WORK" {
+		fmt.Printf("Work session completed!\n")
+	} else {
+		fmt.Printf("Break completed!\n")
+	}
+	fmt.Println()
 }
 
 func (r *Renderer) CancelledMessage(sessionNum int) {
-	fmt.Printf("\n\nPomodoro %d cancelled\n", sessionNum)
+	// This function is no longer used
 }
 
 func FormatDuration(d time.Duration) string {
@@ -131,20 +140,31 @@ func FormatDurationShort(d time.Duration) string {
 }
 
 func PrintRecap(sessions []struct {
-	Duration    string
-	StartTime   string
-	EndTime     string
-	Completed   bool
-	Cancelled   bool
+	WorkDuration   string
+	BreakDuration  string
+	WorkStartTime  string
+	WorkEndTime    string
+	BreakEndTime   string
+	WorkCompleted  bool
+	BreakCompleted bool
+	BreakSkipped   bool
 }, totalTime time.Duration) {
-	fmt.Println()
-	fmt.Println("--- Session Recap ---")
 	for i, s := range sessions {
-		status := "✓"
-		if s.Cancelled {
-			status = "✗"
+		workStatus := "✓"
+		if !s.WorkCompleted {
+			workStatus = "✗"
 		}
-		fmt.Printf("%d. %s - %s - %s %s\n", i+1, s.Duration, s.StartTime, s.EndTime, status)
+		fmt.Printf("%d. %s - %s - %s WORK %s\n", i+1, s.WorkDuration, s.WorkStartTime, s.WorkEndTime, workStatus)
+
+		if s.BreakSkipped {
+			fmt.Printf("   %s - %s - %s BREAK SKIPPED\n", s.BreakDuration, s.WorkEndTime, s.BreakEndTime)
+		} else {
+			breakStatus := "✓"
+			if !s.BreakCompleted {
+				breakStatus = "✗"
+			}
+			fmt.Printf("   %s - %s - %s BREAK %s\n", s.BreakDuration, s.WorkEndTime, s.BreakEndTime, breakStatus)
+		}
 	}
 	fmt.Printf("Total: %s\n", FormatDuration(totalTime))
 }
