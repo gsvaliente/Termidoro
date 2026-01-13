@@ -1,9 +1,11 @@
 package ui
 
 import (
+	"bufio"
 	"fmt"
 	"math"
 	"os"
+	"strings"
 	"time"
 
 	"golang.org/x/term"
@@ -19,8 +21,6 @@ type Renderer struct {
 	customName  string
 	termWidth   int
 	termHeight  int
-	centerX     int
-	centerY     int
 }
 
 type RGB struct {
@@ -54,14 +54,6 @@ func NewRenderer(totalSeconds int64, sessionNum int, sessionType timer.SessionTy
 		width, height = 80, 24 // Fallback size
 	}
 
-	// Calculate center positions for a 73-char wide box (35 progress bar + brackets + time text)
-	boxWidth := 73
-	centerX := (width - boxWidth) / 2
-	if centerX < 1 {
-		centerX = 1
-	}
-	centerY := height / 2
-
 	// Handle custom name
 	var displayName string
 	if sessionType == timer.WORK {
@@ -83,8 +75,6 @@ func NewRenderer(totalSeconds int64, sessionNum int, sessionType timer.SessionTy
 		customName:  displayName,
 		termWidth:   width,
 		termHeight:  height,
-		centerX:     centerX,
-		centerY:     centerY,
 	}
 }
 
@@ -106,6 +96,43 @@ func (r *Renderer) Finish() {
 	fmt.Print("\033[4B\n")
 }
 
+func (r *Renderer) DisplayMessage(message string) {
+	// Display message below the timer UI (line 6)
+	fmt.Printf("\033[6;1H\033[K%s", message)
+}
+
+func (r *Renderer) ClearMessage() {
+	// Clear the message line (line 6)
+	fmt.Printf("\033[6;1H\033[K")
+}
+
+func (r *Renderer) PromptContinue() bool {
+	// Show prompt below the timer UI (line 7)
+	fmt.Printf("\033[7;1H\033[KContinue with another cycle? [Y/n]: ")
+	fmt.Print("\033[?25h") // Show cursor for input
+
+	reader := bufio.NewReader(os.Stdin)
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(strings.ToLower(input))
+
+	fmt.Print("\033[?25l") // Hide cursor again
+
+	if input == "n" || input == "no" {
+		return false
+	}
+	return true
+}
+
+func (r *Renderer) UpdateTerminalSize() {
+	width, height, err := term.GetSize(int(os.Stdout.Fd()))
+	if err == nil {
+		r.termWidth = width
+		r.termHeight = height
+		// Redraw the header with new terminal size
+		r.DrawHeader()
+	}
+}
+
 func (r *Renderer) GetCurrent() int {
 	return r.current
 }
@@ -115,23 +142,23 @@ func (r *Renderer) DrawTimeLeft(elapsed, total time.Duration) {
 	percent := float64(elapsed) / float64(total) * 100
 	bar := r.createProgressBar(percent)
 
-	// Position progress bar relative to centered box: centerY + 2, centerX + 2
-	progressX := r.centerX + 2
-	progressY := r.centerY + 2
+	// Position progress bar at line 3, column 2 (inside box)
+	progressX := 2
+	progressY := 3
 	fmt.Printf("\033[%d;%dH\033[K%s  %.0f%%", progressY, progressX, bar, percent)
 
-	// Position time remaining in bottom right corner: centerY + 2, centerX + 70
-	timeX := r.centerX + 70
-	timeY := r.centerY + 2
+	// Position time remaining at line 3, column 60 (inside box, right side)
+	timeX := 60
+	timeY := 3
 	fmt.Printf("\033[%d;%dH%dm %02ds left", timeY, timeX, int(remaining.Minutes()), int(remaining.Seconds())%60)
 }
 
 func (r *Renderer) DrawPercentage(elapsed, total time.Duration) {
 	percent := float64(elapsed) / float64(total) * 100
 	bar := r.createProgressBar(percent)
-	// Position percentage relative to centered box: centerY + 2, centerX + 2
-	progressX := r.centerX + 2
-	progressY := r.centerY + 2
+	// Position percentage at line 3, column 2 (inside box)
+	progressX := 2
+	progressY := 3
 	fmt.Printf("\033[%d;%dH\033[K%s  %.0f%%", progressY, progressX, bar, percent)
 }
 
@@ -173,17 +200,13 @@ func (r *Renderer) createProgressBar(percent float64) string {
 func (r *Renderer) DrawHeader() {
 	fmt.Print("\033[2J\033[H")
 
-	// Position header at center
-	headerX := r.centerX + 1
-	headerY := r.centerY
+	// Draw session type and cycle number at top (line 1)
+	fmt.Printf("\033[1;1H[%s Cycle %d]", r.customName, r.cycleNum)
 
-	// Draw session type and cycle number
-	fmt.Printf("\033[%d;%dH[%s Cycle %d]", headerY, headerX, r.customName, r.cycleNum)
-
-	// Draw complete box borders
-	fmt.Printf("\033[%d;%dH┌─────────────────────────────────────────────────────────────────────┐", headerY+1, headerX)
-	fmt.Printf("\033[%d;%dH│                                                                 │", headerY+2, headerX)
-	fmt.Printf("\033[%d;%dH└─────────────────────────────────────────────────────────────────────┘", headerY+3, headerX)
+	// Draw complete box borders starting at line 2
+	fmt.Printf("\033[2;1H┌─────────────────────────────────────────────────────────────────────┐")
+	fmt.Printf("\033[3;1H│                                                                 │")
+	fmt.Printf("\033[4;1H└─────────────────────────────────────────────────────────────────────┘")
 }
 
 func (r *Renderer) ClearScreen() {

@@ -87,14 +87,17 @@ func main() {
 		}
 		sessionNum++
 
-		// Add 2-second pause between sessions
+		// Add 2-second pause between sessions with renderer message
+		workProgress := ui.NewRenderer(0, sessionNum-1, timer.WORK, cycleNum, customWorkName)
 		if !autoYesFlag {
-			fmt.Printf("\nTime for a break!")
+			workProgress.DisplayMessage("Time for a break!")
 			time.Sleep(2 * time.Second)
+			workProgress.ClearMessage()
 		} else {
 			// For auto-yes, still show brief transition
-			fmt.Printf("\nTime for a break!")
+			workProgress.DisplayMessage("Time for a break!")
 			time.Sleep(2 * time.Second)
+			workProgress.ClearMessage()
 		}
 
 		// Run BREAK session
@@ -106,10 +109,15 @@ func main() {
 		}
 		sessionNum++
 
-		// Ask to continue with another cycle
-		if !askContinue() {
-			printRecap(engine)
-			break
+		// Ask to continue with another cycle using renderer
+		continueProgress := ui.NewRenderer(0, sessionNum-1, timer.WORK, cycleNum, customWorkName)
+		if !autoYesFlag {
+			continueProgress.DisplayMessage("")
+			if !continueProgress.PromptContinue() {
+				printRecap(engine)
+				break
+			}
+			continueProgress.ClearMessage()
 		}
 		cycleNum++
 	}
@@ -198,7 +206,9 @@ func runSession(engine *timer.Engine, sessionNum int, duration time.Duration, se
 	progress.Start()
 
 	ticker := time.NewTicker(time.Second)
+	resizeTicker := time.NewTicker(500 * time.Millisecond) // Check for resizes every 500ms
 	defer ticker.Stop()
+	defer resizeTicker.Stop()
 
 	for {
 		select {
@@ -212,6 +222,12 @@ func runSession(engine *timer.Engine, sessionNum int, duration time.Duration, se
 			if current >= int(totalSeconds) {
 				return true
 			}
+		case <-resizeTicker.C:
+			progress.UpdateTerminalSize()
+			// Redraw current time left with updated terminal size
+			current := progress.GetCurrent()
+			elapsed := time.Duration(current) * time.Second
+			progress.DrawTimeLeft(elapsed, duration)
 		case <-cancelled:
 			return false
 		}
@@ -222,22 +238,6 @@ func runSession(engine *timer.Engine, sessionNum int, duration time.Duration, se
 	engine.CompleteSession(sessionNum - 1)
 
 	notify.PlayCompletionSound()
-	return true
-}
-
-func askContinue() bool {
-	if autoYesFlag {
-		return true
-	}
-
-	fmt.Print("Continue with another cycle? [Y/n]: ")
-	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(strings.ToLower(input))
-
-	if input == "n" || input == "no" {
-		return false
-	}
 	return true
 }
 
