@@ -92,16 +92,14 @@ func main() {
 		}
 		sessionNum++
 
-		// Brief pause between sessions with renderer message (reduced from 2s to 300ms)
+		// Instant transition between sessions
 		workProgress := ui.NewRenderer(0, sessionNum-1, timer.WORK, cycleNum, customWorkName)
 		if !autoYesFlag {
 			workProgress.DisplayMessage("Time for a break!")
-			time.Sleep(300 * time.Millisecond)
 			workProgress.ClearMessage()
 		} else {
 			// For auto-yes, still show brief transition
 			workProgress.DisplayMessage("Time for a break!")
-			time.Sleep(300 * time.Millisecond)
 			workProgress.ClearMessage()
 		}
 
@@ -219,9 +217,9 @@ func runSession(engine *timer.Engine, sessionNum int, duration time.Duration, se
 		select {
 		case <-ticker.C:
 			current := progress.GetCurrent()
-			elapsed := time.Duration(current) * time.Second
 
 			progress.Increment()
+			elapsed := time.Duration(current) * time.Second
 			progress.DrawTimeLeft(elapsed, duration)
 
 			if current >= int(totalSeconds-1) && current < int(totalSeconds) {

@@ -26,7 +26,11 @@ func PlayWorkCompleteSound() error {
 			fmt.Fprintf(os.Stderr, "Warning: Could not play work completion sound: %v\n", err)
 		}
 	}
-	return beeep.Notify("Work Complete", "Time for a break!", "")
+	// Run notification asynchronously to avoid blocking
+	go func() {
+		beeep.Notify("Work Complete", "Time for a break!", "")
+	}()
+	return nil
 }
 
 func PlayBreakCompleteSound() error {
@@ -35,7 +39,11 @@ func PlayBreakCompleteSound() error {
 			fmt.Fprintf(os.Stderr, "Warning: Could not play break completion sound: %v\n", err)
 		}
 	}
-	return beeep.Notify("Break Complete", "Ready for another session?", "")
+	// Run notification asynchronously to avoid blocking
+	go func() {
+		beeep.Notify("Break Complete", "Ready for another session?", "")
+	}()
+	return nil
 }
 
 func PlayAlert(title, message string) error {
@@ -43,13 +51,9 @@ func PlayAlert(title, message string) error {
 }
 
 func flashTerminal() {
-	// Flash terminal 3 times
-	for i := 0; i < 3; i++ {
-		fmt.Print("\033[5m") // Inverse video
-		time.Sleep(100 * time.Millisecond)
-		fmt.Print("\033[25m") // Normal video
-		time.Sleep(100 * time.Millisecond)
-	}
+	// Instant visual feedback without blocking delay
+	fmt.Print("\033[5m")  // Inverse video
+	fmt.Print("\033[25m") // Normal video
 }
 
 func playWorkSound() error {
