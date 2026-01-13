@@ -92,16 +92,16 @@ func main() {
 		}
 		sessionNum++
 
-		// Add 2-second pause between sessions with renderer message
+		// Brief pause between sessions with renderer message (reduced from 2s to 300ms)
 		workProgress := ui.NewRenderer(0, sessionNum-1, timer.WORK, cycleNum, customWorkName)
 		if !autoYesFlag {
 			workProgress.DisplayMessage("Time for a break!")
-			time.Sleep(2 * time.Second)
+			time.Sleep(300 * time.Millisecond)
 			workProgress.ClearMessage()
 		} else {
 			// For auto-yes, still show brief transition
 			workProgress.DisplayMessage("Time for a break!")
-			time.Sleep(2 * time.Second)
+			time.Sleep(300 * time.Millisecond)
 			workProgress.ClearMessage()
 		}
 
@@ -248,16 +248,6 @@ func runSession(engine *timer.Engine, sessionNum int, duration time.Duration, se
 	progress.FinalMessage(sessionNum, cycleNum)
 	engine.CompleteSession(sessionNum - 1)
 
-	// Play appropriate sound based on session type
-	fmt.Fprintf(os.Stderr, "[DEBUG] Session completed, about to play notification\n")
-	if sessionType == timer.WORK {
-		fmt.Fprintf(os.Stderr, "[DEBUG] Calling notify.PlayWorkCompleteSound()\n")
-		notify.PlayWorkCompleteSound()
-	} else {
-		fmt.Fprintf(os.Stderr, "[DEBUG] Calling notify.PlayBreakCompleteSound()\n")
-		notify.PlayBreakCompleteSound()
-	}
-	fmt.Fprintf(os.Stderr, "[DEBUG] Notification call completed\n")
 	return true
 }
 

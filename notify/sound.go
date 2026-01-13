@@ -89,12 +89,11 @@ func playMacOSSound(soundType string) error {
 		soundFile = "/System/Library/Sounds/Glass.aiff"
 	}
 
-	// Play sound using afplay (instant playback, no timeout needed)
+	// Play sound using afplay in background for instant UI response
 	afplayCmd := exec.Command("afplay", soundFile)
-	err := afplayCmd.Run()
-
+	err := afplayCmd.Start()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: afplay failed to play %s: %v\n", soundFile, err)
+		fmt.Fprintf(os.Stderr, "Warning: afplay failed to start %s: %v\n", soundFile, err)
 		return err
 	}
 
