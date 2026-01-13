@@ -1,0 +1,180 @@
+.\" Man page for termidoro
+.TH TERMIDORO 1 "January 2026" "Termidoro 1.0" "User Commands"
+
+.SH NAME
+termidoro \- terminal pomodoro timer
+
+.SH SYNOPSIS
+.B termidoro
+.RI [OPTIONS]
+.RI [work-duration]
+.RI [break-duration]
+.RI [custom-name]
+
+.SH DESCRIPTION
+termidoro is a terminal-based Pomodoro timer that helps you manage time and maintain focus during work sessions. It features a responsive UI that adapts to terminal resizing, progress visualization with gradient colors, sound notifications, and comprehensive session tracking.
+
+The application implements the Pomodoro Technique® using work/break cycles to break down work into focused intervals separated by short breaks.
+
+.SH OPTIONS
+
+.TP
+.BR \-m " \fIminutes\fP"
+Set default work duration in minutes. Default is 25 minutes.
+If positional arguments are also provided, the last specified value takes precedence.
+
+.TP
+.BR \-y
+Enable auto-confirm mode for scripting and automation. When enabled, the timer will automatically continue to the next cycle without prompting the user.
+
+.SH POSITIONAL ARGUMENTS
+
+.TP
+.I work-duration
+Duration for work sessions. Can be specified as:
+- Number (e.g., 25) - interpreted as minutes
+- With time unit (e.g., 25m, 1h30m, 90s)
+Default: 25 minutes
+
+.TP
+.I break-duration
+Duration for break sessions. Follows the same format as work-duration.
+Default: 5 minutes
+
+.TP
+.I custom-name
+Optional custom name for work sessions. Useful for tracking different types of activities.
+Default: "WORK"
+
+.SH EXAMPLES
+
+Basic usage with default settings:
+.PP
+.RS
+$ termidoro
+.RE
+
+Custom 30-minute work, 10-minute break cycles:
+.PP
+.RS
+$ termidoro 30 10
+.RE
+
+With custom session name:
+.PP
+.RS
+$ termidoro 25 5 "Feature Development"
+.RE
+
+Long sessions with mixed time units:
+.PP
+.RS
+$ termidoro 2h 30m "Planning Session"
+.RE
+
+Automated mode for scripting:
+.PP
+.RS
+$ termidoro -y 25 5
+.RE
+
+.SH CONTROLS
+
+During active sessions:
+.TP
+.B Ctrl+C
+Cancel the current session and display a recap of completed sessions.
+
+Between sessions (interactive mode):
+.TP
+.B Y
+Continue to the next session.
+.TP
+.B N
+End the timer and show session recap.
+
+.SH OUTPUT FORMAT
+
+The timer interface displays:
+.nf
+Line 1: [WORK Cycle N]
+Line 2: ┌─────────────────────────────────────────────────────────────────────┐
+Line 3: │ [progress bar]          X:XX left │
+Line 4: └─────────────────────────────────────────────────────────────────────┘
+Line 5: Messages (Time for a break!, etc.)
+Line 6: Prompts (Continue with another cycle? [Y/n])
+.fi
+
+Session recap format:
+.nf
+--- Session Recap ---
+1. 25m 00 - 09:00 - 09:25 ✓
+2. 5m 00 - 09:25 - 09:30 ✓
+3. 25m 00 - 09:30 - 09:55 ✓
+Total: 55m 00s
+.fi
+
+.SH FEATURES
+
+.IP \(bu 4
+Responsive terminal UI that automatically adapts to window resizing
+.IP \(bu 4
+Gradient progress bar with percentage completion and time remaining
+.IP \(bu 4
+Sound notifications using system notification sounds
+.IP \(bu 4
+Session tracking with detailed statistics and recaps
+.IP \(bu 4
+Flexible duration parsing supporting multiple time formats
+.IP \(bu 4
+Interactive and automated modes
+.IP \(bu 4
+Custom session naming for better organization
+
+.SH DEPENDENCIES
+
+Requires:
+.RS
+.IP \(bu 2
+Go 1.25.5 or later
+.RE
+
+Uses Go packages:
+.RS
+.IP \(bu 2
+golang.org/x/term
+.IP \(bu 2
+github.com/gen2brain/beeep
+.RE
+
+.SH PLATFORMS
+
+termidoro is cross-platform and supports:
+.RS
+.IP \(bu 2
+Linux
+.IP \(bu 2
+macOS  
+.IP \(bu 2
+Windows (with ANSI-compatible terminal)
+.RE
+
+.SH FILES
+
+The application does not require any configuration files. All settings are provided via command-line arguments.
+
+.SH SEE ALSO
+
+.BR time (1)
+
+.SH BUGS
+
+Report bugs and feature requests through the project's issue tracker.
+
+.SH AUTHOR
+
+[Author Name] <[email]>
+
+.SH DISCLAIMER
+
+Pomodoro Technique® is a registered trademark of Francesco Cirillo. This application is not affiliated with or endorsed by Francesco Cirillo.
