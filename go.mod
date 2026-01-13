@@ -1,8 +1,11 @@
-module pomodoro
+module termidoro
 
 go 1.25.5
 
-require github.com/gen2brain/beeep v0.11.2
+require (
+	github.com/gen2brain/beeep v0.11.2
+	golang.org/x/term v0.39.0
+)
 
 require (
 	git.sr.ht/~jackmordaunt/go-toast v1.1.2 // indirect
@@ -15,5 +18,4 @@ require (
 	github.com/sergeymakinen/go-ico v1.0.0-beta.0 // indirect
 	github.com/tadvi/systray v0.0.0-20190226123456-11a2b8fa57af // indirect
 	golang.org/x/sys v0.40.0 // indirect
-	golang.org/x/term v0.39.0 // indirect
 )

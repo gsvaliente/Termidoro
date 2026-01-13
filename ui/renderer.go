@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"golang.org/x/term"
-	"pomodoro/timer"
+	"termidoro/timer"
 )
 
 type Renderer struct {

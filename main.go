@@ -10,9 +10,9 @@ import (
 	"syscall"
 	"time"
 
-	"pomodoro/notify"
-	"pomodoro/timer"
-	"pomodoro/ui"
+	"termidoro/notify"
+	"termidoro/timer"
+	"termidoro/ui"
 )
 
 var (
