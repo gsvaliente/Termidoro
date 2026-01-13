@@ -224,13 +224,15 @@ func runSession(engine *timer.Engine, sessionNum int, duration time.Duration, se
 			progress.Increment()
 			progress.DrawTimeLeft(elapsed, duration)
 
-			if current >= int(totalSeconds) {
-				// Play notification BEFORE returning
+			if current >= int(totalSeconds-1) && current < int(totalSeconds) {
+				// Play notification 1 second before completion for instant feel
 				if sessionType == timer.WORK {
 					notify.PlayWorkCompleteSound()
 				} else {
 					notify.PlayBreakCompleteSound()
 				}
+			}
+			if current >= int(totalSeconds) {
 				return true
 			}
 		case <-resizeTicker.C:
