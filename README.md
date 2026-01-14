@@ -64,14 +64,14 @@ go install
 
 #### Flags
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `-m <minutes>` | - | Set default work duration in minutes (default: 25) |
-| `-y` | - | Auto-confirm prompts for scripting/automation |
-| `--work <duration>` | `-w` | Work duration (e.g., 5m, 30m, 1h30m) |
-| `--break <duration>` | `-b` | Break duration (e.g., 1m, 10m, 30s) |
-| `--name <text>` | `-n` | Custom name for work sessions |
-| `--no-sound` | - | Disable sound notifications |
+| Flag                 | Short | Description                                        |
+| -------------------- | ----- | -------------------------------------------------- |
+| `-m <minutes>`       | -     | Set default work duration in minutes (default: 25) |
+| `-y`                 | -     | Auto-confirm prompts for scripting/automation      |
+| `--work <duration>`  | `-w`  | Work duration (e.g., 5m, 30m, 1h30m)               |
+| `--break <duration>` | `-b`  | Break duration (e.g., 1m, 10m, 30s)                |
+| `--name <text>`      | `-n`  | Custom name for work sessions                      |
+| `--no-sound`         | -     | Disable sound notifications                        |
 
 #### Flag Precedence
 
@@ -195,7 +195,6 @@ Termidoro implements the Pomodoro Technique®, a time management method develope
 2. **Set the timer** to your desired work duration
 3. **Work on the task** until the timer rings
 4. **Take a short break** (3-5 minutes)
-5. **After 4 cycles**, take a longer break (15-30 minutes)
 
 ## Dependencies
 
