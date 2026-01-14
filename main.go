@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 	"strings"
@@ -13,6 +14,8 @@ import (
 	"termidoro/notify"
 	"termidoro/timer"
 	"termidoro/ui"
+
+	"github.com/sahilm/fuzzy"
 )
 
 var (
@@ -43,27 +46,84 @@ var templates = map[string]Template{
 	"study":     {45 * time.Minute, 15 * time.Minute, "Study"},
 }
 
-func parseDuration(durationStr string) time.Duration {
+func parseDuration(durationStr string) (time.Duration, error) {
 	if durationStr == "" {
-		return 0
+		return 0, nil
 	}
 
-	// Default to minutes if no unit specified
 	if len(durationStr) == 0 {
-		return 0
+		return 0, nil
 	}
 
-	// Parse using time.ParseDuration
 	duration, err := time.ParseDuration(durationStr)
-	if err != nil {
-		// If parsing fails, try appending 'm' for minutes
-		if duration, err := time.ParseDuration(durationStr + "m"); err == nil {
-			return duration
-		}
-		return 0
+	if err == nil {
+		return duration, nil
 	}
 
-	return duration
+	duration, err = time.ParseDuration(durationStr + "m")
+	if err == nil {
+		return duration, nil
+	}
+
+	return 0, fmt.Errorf("invalid duration format")
+}
+
+func getTemplateSuggestion(input string) string {
+	templateNames := make([]string, 0, len(templates))
+	for name := range templates {
+		templateNames = append(templateNames, name)
+	}
+
+	matches := fuzzy.Find(input, templateNames)
+	if len(matches) > 0 {
+		return matches[0].Str
+	}
+	return ""
+}
+
+func printTemplateError(templateName string) {
+	fmt.Printf("Error: Unknown template '%s'\n\n", templateName)
+
+	suggestion := getTemplateSuggestion(templateName)
+	if suggestion != "" {
+		fmt.Printf("Did you mean '%s'?\n\n", suggestion)
+	}
+
+	fmt.Println("Available templates:")
+	fmt.Println()
+	fmt.Println("  Name        Work      Break")
+	fmt.Println("  ─────────────────────────────────────")
+
+	names := make([]string, 0, len(templates))
+	for name := range templates {
+		names = append(names, name)
+	}
+	for _, name := range names {
+		t := templates[name]
+		workMin := int(t.WorkDuration.Minutes())
+		breakMin := int(t.BreakDuration.Minutes())
+		nameStr := name
+		if name == suggestion {
+			nameStr = name + "  ←"
+		}
+		fmt.Printf("  %-10s  %dm       %dm       (%s)\n", nameStr, workMin, breakMin, t.Name)
+	}
+	fmt.Println()
+	fmt.Println("Use -T to list all templates.")
+	fmt.Println("Example: termidoro -t focus")
+	os.Exit(1)
+}
+
+func printDurationError(durationStr string, flagName string) {
+	fmt.Printf("Error: Invalid duration format '%s'\n\n", durationStr)
+	fmt.Println("Valid formats:")
+	fmt.Println("  • 25m      (minutes)")
+	fmt.Println("  • 1h30m    (hours and minutes)")
+	fmt.Println("  • 30s      (seconds only)")
+	fmt.Println("  • 1h       (hours only)")
+	fmt.Println()
+	fmt.Printf("Example: --%s 25m\n", flagName)
+	os.Exit(1)
 }
 
 func listTemplates() {
@@ -107,12 +167,11 @@ func main() {
 	}
 
 	if templateFlag != "" {
-		template, exists := templates[strings.ToLower(templateFlag)]
+		_, exists := templates[strings.ToLower(templateFlag)]
 		if !exists {
-			fmt.Printf("Error: Unknown template '%s'\n", templateFlag)
-			fmt.Println("Use -T to list available templates.")
-			os.Exit(1)
+			printTemplateError(templateFlag)
 		}
+		template := templates[strings.ToLower(templateFlag)]
 		cachedWorkDuration = template.WorkDuration
 		cachedBreakDuration = template.BreakDuration
 		customWorkName = template.Name
@@ -136,28 +195,48 @@ func main() {
 	args := flag.Args()
 
 	if workFlag != "" {
-		cachedWorkDuration = parseDuration(workFlag)
-		if cachedWorkDuration == 0 {
+		duration, err := parseDuration(workFlag)
+		if err != nil {
+			printDurationError(workFlag, "work")
+		}
+		if duration == 0 {
 			cachedWorkDuration = 25 * time.Minute
+		} else {
+			cachedWorkDuration = duration
 		}
 		durationsSet = true
 	} else if len(args) > 0 {
-		cachedWorkDuration = parseDuration(args[0])
-		if cachedWorkDuration == 0 {
+		duration, err := parseDuration(args[0])
+		if err != nil {
+			printDurationError(args[0], "work")
+		}
+		if duration == 0 {
 			cachedWorkDuration = 25 * time.Minute
+		} else {
+			cachedWorkDuration = duration
 		}
 		durationsSet = true
 	}
 
 	if breakFlag != "" {
-		cachedBreakDuration = parseDuration(breakFlag)
-		if cachedBreakDuration == 0 {
+		duration, err := parseDuration(breakFlag)
+		if err != nil {
+			printDurationError(breakFlag, "break")
+		}
+		if duration == 0 {
 			cachedBreakDuration = 5 * time.Minute
+		} else {
+			cachedBreakDuration = duration
 		}
 	} else if len(args) > 1 {
-		cachedBreakDuration = parseDuration(args[1])
-		if cachedBreakDuration == 0 {
+		duration, err := parseDuration(args[1])
+		if err != nil {
+			printDurationError(args[1], "break")
+		}
+		if duration == 0 {
 			cachedBreakDuration = 5 * time.Minute
+		} else {
+			cachedBreakDuration = duration
 		}
 	}
 
@@ -242,7 +321,21 @@ func getDuration(sessionType timer.SessionType) time.Duration {
 	// Get work duration
 	fmt.Print("Work duration in minutes (default 25): ")
 	reader := bufio.NewReader(os.Stdin)
-	input, _ := reader.ReadString('\n')
+	input, err := reader.ReadString('\n')
+	if err != nil {
+		if err == io.EOF {
+			fmt.Println("\nInput closed. Using default values.")
+			cachedWorkDuration = 25 * time.Minute
+			cachedBreakDuration = 5 * time.Minute
+			durationsSet = true
+			if sessionType == timer.WORK {
+				return cachedWorkDuration
+			}
+			return cachedBreakDuration
+		}
+		fmt.Fprintf(os.Stderr, "Error reading input: %v\n", err)
+		cachedWorkDuration = 25 * time.Minute
+	}
 	input = strings.TrimSpace(input)
 
 	if input == "" {
@@ -258,7 +351,16 @@ func getDuration(sessionType timer.SessionType) time.Duration {
 
 	// Get break duration
 	fmt.Print("Break duration in minutes (default 5): ")
-	input, _ = reader.ReadString('\n')
+	input, err = reader.ReadString('\n')
+	if err != nil {
+		if err == io.EOF {
+			fmt.Println("\nInput closed. Using default values.")
+			cachedBreakDuration = 5 * time.Minute
+		} else {
+			fmt.Fprintf(os.Stderr, "Error reading input: %v\n", err)
+			cachedBreakDuration = 5 * time.Minute
+		}
+	}
 	input = strings.TrimSpace(input)
 
 	if input == "" {
