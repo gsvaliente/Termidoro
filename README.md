@@ -24,6 +24,14 @@ A terminal-based Pomodoro timer with a responsive UI, sound notifications, and s
 ```bash
 git clone <repository-url>
 cd timer
+make build
+```
+
+This will create a `termidoro` binary in the project directory. It is recommended to use this method to build the program. The binary is not included in the repository and should be built from the source.
+
+Alternatively, you can use `go build`:
+
+```bash
 go build
 ```
 
