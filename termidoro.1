@@ -17,15 +17,28 @@ termidoro is a terminal-based Pomodoro timer that helps you manage time and main
 The application implements the Pomodoro Technique® using work/break cycles to break down work into focused intervals separated by short breaks.
 
 .SH OPTIONS
-
 .TP
-.BR \-m " \fIminutes\fP"
-Set default work duration in minutes. Default is 25 minutes.
-If positional arguments are also provided, the last specified value takes precedence.
-
+.BR --work " \fIduration\fP", " -w"
+Set work duration (e.g., 5m, 30m, 1h30m).
 .TP
-.BR \-y
+.BR --break " \fIduration\fP", " -b"
+Set break duration (e.g., 1m, 10m, 30s).
+.TP
+.BR --name " \fItext\fP", " -n"
+Custom name for work sessions.
+.TP
+.BR --no-sound
+Disable sound notifications.
+.TP
+.BR --template " \fIname\fP", " -t"
+Use a preset template (e.g., `deep-work`, `sprint`).
+.TP
+.BR --templates, " -T"
+List available templates.
+.TP
+.BR -y
 Enable auto-confirm mode for scripting and automation. When enabled, the timer will automatically continue to the next cycle without prompting the user.
+
 
 .SH POSITIONAL ARGUMENTS
 

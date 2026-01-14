@@ -72,6 +72,8 @@ go install
 | `--break <duration>` | `-b`  | Break duration (e.g., 1m, 10m, 30s)                |
 | `--name <text>`      | `-n`  | Custom name for work sessions                      |
 | `--no-sound`         | -     | Disable sound notifications                        |
+| `--template <name>`  | `-t`  | Use a preset template (e.g., `deep-work`, `sprint`) |
+| `--templates`        | `-T`  | List available templates                           |
 
 #### Flag Precedence
 
@@ -144,6 +146,23 @@ You can specify durations using any of these formats:
 
 # Auto-confirm with custom durations using flags
 ./termidoro -y --work 30m --break 10m
+```
+
+### Templates
+
+Termidoro includes several preset templates for common work patterns. You can use the `--template` or `-t` flag to use a template.
+
+| Template    | Work Duration | Break Duration |
+| ----------- | ------------- | -------------- |
+| `deep-work` | 50 minutes    | 10 minutes     |
+| `sprint`    | 15 minutes    | 3 minutes      |
+| `focus`     | 25 minutes    | 5 minutes      |
+| `study`     | 45 minutes    | 15 minutes     |
+
+To list the available templates, use the `--templates` or `-T` flag.
+
+```bash
+./termidoro -t sprint
 ```
 
 ### Mixed Flags and Positional Arguments
