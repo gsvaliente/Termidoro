@@ -41,7 +41,13 @@ go install
 # Default 25-minute work, 5-minute break cycles
 ./termidoro
 
-# Custom durations (minutes)
+# Using long-form flags
+./termidoro --work 5m --break 1m --name Sample
+
+# Using short-form flags
+./termidoro -w 5m -b 1m -n Sample
+
+# Custom durations (minutes) - positional arguments still work
 ./termidoro 30 10
 
 # Custom durations with time units
@@ -58,8 +64,22 @@ go install
 
 #### Flags
 
-- `-m <minutes>`: Set default work duration in minutes (default: 25)
-- `-y`: Auto-confirm prompts for scripting/automation
+| Flag | Short | Description |
+|------|-------|-------------|
+| `-m <minutes>` | - | Set default work duration in minutes (default: 25) |
+| `-y` | - | Auto-confirm prompts for scripting/automation |
+| `--work <duration>` | `-w` | Work duration (e.g., 5m, 30m, 1h30m) |
+| `--break <duration>` | `-b` | Break duration (e.g., 1m, 10m, 30s) |
+| `--name <text>` | `-n` | Custom name for work sessions |
+| `--no-sound` | - | Disable sound notifications |
+
+#### Flag Precedence
+
+Flags take precedence over positional arguments:
+
+1. Flags (`--work`, `-w`, `--break`, `-b`, `--name`, `-n`)
+2. Positional arguments (for backward compatibility)
+3. Default values (25m work, 5m break)
 
 #### Positional Arguments
 
@@ -111,6 +131,26 @@ You can specify durations using any of these formats:
 ```bash
 # 2-hour work session with 30-minute break
 ./termidoro 2h 30m "Planning"
+```
+
+### Using Flags
+
+```bash
+# Using long-form flags
+./termidoro --work 5m --break 1m --name Sample
+
+# Using short-form flags
+./termidoro -w 5m -b 1m -n Sample
+
+# Auto-confirm with custom durations using flags
+./termidoro -y --work 30m --break 10m
+```
+
+### Mixed Flags and Positional Arguments
+
+```bash
+# Flags take precedence over positional arguments
+./termidoro -y --work 30m "Deep Work"
 ```
 
 ## Controls During Sessions

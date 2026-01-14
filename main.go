@@ -19,6 +19,9 @@ var (
 	minutesFlag         int
 	autoYesFlag         bool
 	noSoundFlag         bool
+	workFlag            string
+	breakFlag           string
+	nameFlag            string
 	cachedWorkDuration  time.Duration
 	cachedBreakDuration time.Duration
 	customWorkName      string
@@ -52,6 +55,12 @@ func init() {
 	flag.IntVar(&minutesFlag, "m", 25, "Default work duration in minutes")
 	flag.BoolVar(&autoYesFlag, "y", false, "Auto-confirm prompts (for scripting)")
 	flag.BoolVar(&noSoundFlag, "no-sound", false, "Disable sound notifications")
+	flag.StringVar(&workFlag, "work", "", "Work duration (e.g., 5m, 30m, 1h30m)")
+	flag.StringVar(&workFlag, "w", "", "Work duration (short form)")
+	flag.StringVar(&breakFlag, "break", "", "Break duration (e.g., 1m, 10m, 30s)")
+	flag.StringVar(&breakFlag, "b", "", "Break duration (short form)")
+	flag.StringVar(&nameFlag, "name", "", "Custom name for work sessions")
+	flag.StringVar(&nameFlag, "n", "", "Custom name for work sessions (short form)")
 	flag.Parse()
 }
 
@@ -65,20 +74,36 @@ func main() {
 
 	// Parse positional arguments after flag parsing
 	args := flag.Args()
-	if len(args) > 0 {
+
+	if workFlag != "" {
+		cachedWorkDuration = parseDuration(workFlag)
+		if cachedWorkDuration == 0 {
+			cachedWorkDuration = 25 * time.Minute
+		}
+		durationsSet = true
+	} else if len(args) > 0 {
 		cachedWorkDuration = parseDuration(args[0])
 		if cachedWorkDuration == 0 {
 			cachedWorkDuration = 25 * time.Minute
 		}
 		durationsSet = true
 	}
-	if len(args) > 1 {
+
+	if breakFlag != "" {
+		cachedBreakDuration = parseDuration(breakFlag)
+		if cachedBreakDuration == 0 {
+			cachedBreakDuration = 5 * time.Minute
+		}
+	} else if len(args) > 1 {
 		cachedBreakDuration = parseDuration(args[1])
 		if cachedBreakDuration == 0 {
 			cachedBreakDuration = 5 * time.Minute
 		}
 	}
-	if len(args) > 2 {
+
+	if nameFlag != "" {
+		customWorkName = nameFlag
+	} else if len(args) > 2 {
 		customWorkName = args[2]
 	}
 
