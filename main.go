@@ -22,11 +22,26 @@ var (
 	workFlag            string
 	breakFlag           string
 	nameFlag            string
+	templateFlag        string
+	listTemplatesFlag   bool
 	cachedWorkDuration  time.Duration
 	cachedBreakDuration time.Duration
 	customWorkName      string
 	durationsSet        bool
 )
+
+type Template struct {
+	WorkDuration  time.Duration
+	BreakDuration time.Duration
+	Name          string
+}
+
+var templates = map[string]Template{
+	"deep-work": {50 * time.Minute, 10 * time.Minute, "Deep Work"},
+	"sprint":    {15 * time.Minute, 3 * time.Minute, "Sprint"},
+	"focus":     {25 * time.Minute, 5 * time.Minute, "Focus"},
+	"study":     {45 * time.Minute, 15 * time.Minute, "Study"},
+}
 
 func parseDuration(durationStr string) time.Duration {
 	if durationStr == "" {
@@ -51,6 +66,19 @@ func parseDuration(durationStr string) time.Duration {
 	return duration
 }
 
+func listTemplates() {
+	fmt.Println("Available templates:")
+	fmt.Println()
+	for name, t := range templates {
+		workMin := int(t.WorkDuration.Minutes())
+		breakMin := int(t.BreakDuration.Minutes())
+		fmt.Printf("  %-12s  %dm work, %dm break  (%s)\n", name, workMin, breakMin, t.Name)
+	}
+	fmt.Println()
+	fmt.Println("Usage: termidoro -t <template>")
+	fmt.Println("Example: termidoro -t deep-work")
+}
+
 func init() {
 	flag.IntVar(&minutesFlag, "m", 25, "Default work duration in minutes")
 	flag.BoolVar(&autoYesFlag, "y", false, "Auto-confirm prompts (for scripting)")
@@ -61,6 +89,10 @@ func init() {
 	flag.StringVar(&breakFlag, "b", "", "Break duration (short form)")
 	flag.StringVar(&nameFlag, "name", "", "Custom name for work sessions")
 	flag.StringVar(&nameFlag, "n", "", "Custom name for work sessions (short form)")
+	flag.StringVar(&templateFlag, "template", "", "Use a preset template (deep-work, sprint, focus, study)")
+	flag.StringVar(&templateFlag, "t", "", "Use a preset template (short form)")
+	flag.BoolVar(&listTemplatesFlag, "templates", false, "List available templates")
+	flag.BoolVar(&listTemplatesFlag, "T", false, "List available templates (short form)")
 	flag.Parse()
 }
 
@@ -68,6 +100,34 @@ func main() {
 	defer func() {
 		fmt.Print("\033[?25h")
 	}()
+
+	if listTemplatesFlag {
+		listTemplates()
+		return
+	}
+
+	if templateFlag != "" {
+		template, exists := templates[strings.ToLower(templateFlag)]
+		if !exists {
+			fmt.Printf("Error: Unknown template '%s'\n", templateFlag)
+			fmt.Println("Use -T to list available templates.")
+			os.Exit(1)
+		}
+		cachedWorkDuration = template.WorkDuration
+		cachedBreakDuration = template.BreakDuration
+		customWorkName = template.Name
+		durationsSet = true
+
+		args := flag.Args()
+		if len(args) > 0 {
+			fmt.Println("Error: Cannot use positional arguments with --template")
+			fmt.Println("Use -T to list available templates.")
+			os.Exit(1)
+		}
+
+		runTimer()
+		return
+	}
 
 	// Configure sound based on flag
 	notify.SetSoundEnabled(!noSoundFlag)
@@ -107,6 +167,10 @@ func main() {
 		customWorkName = args[2]
 	}
 
+	runTimer()
+}
+
+func runTimer() {
 	engine := timer.NewEngine()
 	sessionNum := 1
 	cycleNum := 1
