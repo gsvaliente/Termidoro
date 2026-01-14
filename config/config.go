@@ -78,11 +78,11 @@ func getTemplateSuggestion(input string) string {
 }
 
 func printTemplateError(templateName string) {
-	fmt.Printf("Error: Unknown template '%s'\\n\\n", templateName)
+	fmt.Printf("Error: Unknown template '%s'\n\n", templateName)
 
 	suggestion := getTemplateSuggestion(templateName)
 	if suggestion != "" {
-		fmt.Printf("Did you mean '%s'?\\n\\n", suggestion)
+		fmt.Printf("Did you mean '%s'?\n\n", suggestion)
 	}
 
 	fmt.Println("Available templates:")
@@ -102,7 +102,7 @@ func printTemplateError(templateName string) {
 		if name == suggestion {
 			nameStr = name + "  ←"
 		}
-		fmt.Printf("  %-10s  %dm       %dm       (%s)\\n", nameStr, workMin, breakMin, t.Name)
+		fmt.Printf("  %-10s  %dm       %dm       (%s)\n", nameStr, workMin, breakMin, t.Name)
 	}
 	fmt.Println()
 	fmt.Println("Use -T to list all templates.")
@@ -111,14 +111,14 @@ func printTemplateError(templateName string) {
 }
 
 func printDurationError(durationStr string, flagName string) {
-	fmt.Printf("Error: Invalid duration format '%s'\\n\\n", durationStr)
+	fmt.Printf("Error: Invalid duration format '%s'\n\n", durationStr)
 	fmt.Println("Valid formats:")
 	fmt.Println("  • 25m      (minutes)")
 	fmt.Println("  • 1h30m    (hours and minutes)")
 	fmt.Println("  • 30s      (seconds only)")
 	fmt.Println("  • 1h       (hours only)")
 	fmt.Println()
-	fmt.Printf("Example: --%s 25m\\n", flagName)
+	fmt.Printf("Example: --%s 25m\n", flagName)
 	os.Exit(1)
 }
 
@@ -128,7 +128,7 @@ func listTemplates() {
 	for name, t := range templates {
 		workMin := int(t.WorkDuration.Minutes())
 		breakMin := int(t.BreakDuration.Minutes())
-		fmt.Printf("  %-12s  %dm work, %dm break  (%s)\\n", name, workMin, breakMin, t.Name)
+		fmt.Printf("  %-12s  %dm work, %dm break  (%s)\n", name, workMin, breakMin, t.Name)
 	}
 	fmt.Println()
 	fmt.Println("Usage: termidoro -t <template>")
